@@ -1,0 +1,134 @@
+{
+  "version": "3.0.10",
+  "settings": {
+    "applyvideofilters": true,
+    "backdropcolor": "#000000",
+    "backdropopacity": 81,
+    "blackbars": false,
+    "blockautoplay": true,
+    "blockhfrformats": false,
+    "blockwebmformats": false,
+    "boostvolume": false,
+    "cinemamode": false,
+    "cinemamodewideplayer": false,
+    "controlbar": {
+      "active": false,
+      "autohide": false,
+      "centered": true,
+      "position": "absolute"
+    },
+    "controls": [
+      "loop",
+      "reverse-playlist",
+      "cinema-mode",
+      "size",
+      "pop-up-player",
+      "speed-minus",
+      "speed",
+      "custom-script",
+      "options"
+    ],
+    "controlsvisible": true,
+    "controlspeed": true,
+    "controlspeedmousebutton": false,
+    "controlvolume": false,
+    "controlvolumemousebutton": false,
+    "convertshorts": false,
+    "customcolors": {
+      "--main-color": "#ff0033",
+      "--main-background": "#111111",
+      "--second-background": "#181818",
+      "--hover-background": "#232323",
+      "--main-text": "#eff0f1",
+      "--dimmer-text": "#cccccc",
+      "--shadow": "#000000"
+    },
+    "customcss": "",
+    "customscript": "// ==UserScript==\n// @name         YouTube The way i like it \n// @namespace    http://tampermonkey.net/\n// @version      1.5\n// @description  Hides top bar (content slides up), makes video info full-width, and hides action buttons (like, share, etc.) for a cleaner UI.\n// @author       ayushh\n// @match        https://www.youtube.com/*\n// @grant        GM_addStyle\n// @run-at       document-start\n// ==/UserScript==\n\n(function() {\n    'use strict';\n\n    // --- CONFIGURATION ---\n    const TOP_BAR_TRIGGER_HEIGHT = 50; // The height (in pixels) of the trigger area at the top.\n    const ELEMENT_WAIT_TIMEOUT = 10000; // Max time (in ms) to wait for elements to appear.\n\n    // --- UTILITY FUNCTION ---\n    /**\n     * Waits for a specific element to appear in the DOM.\n     * @param {string} selector - The CSS selector of the element to wait for.\n     * @returns {Promise<Element>} A promise that resolves with the found element.\n     */\n    function waitForElement(selector) {\n        return new Promise((resolve, reject) => {\n            const intervalId = setInterval(() => {\n                const element = document.querySelector(selector);\n                if (element) {\n                    clearInterval(intervalId);\n                    clearTimeout(timeoutId);\n                    resolve(element);\n                }\n            }, 100);\n\n            const timeoutId = setTimeout(() => {\n                clearInterval(intervalId);\n                console.error(`YouTube UI Enhancer: Timed out waiting for element: ${selector}`);\n                reject(new Error(`Element not found: ${selector}`));\n            }, ELEMENT_WAIT_TIMEOUT);\n        });\n    }\n\n\n    // --- CORE LOGIC ---\n    /**\n     * Applies all the visual enhancements to the page.\n     */\n    async function applyYouTubeEnhancements() {\n        if (window.location.pathname !== '/watch') {\n            document.body.classList.remove('video-page-active', 'show-masthead');\n            return;\n        }\n\n        try {\n            await waitForElement('ytd-page-manager');\n            document.body.classList.add('video-page-active');\n            console.log(\"YouTube UI Enhancer: Video page detected. Applying enhancements.\");\n        } catch (error) {\n            console.error(\"YouTube UI Enhancer: Could not apply enhancements.\", error);\n        }\n    }\n\n    // --- INITIALIZATION AND NAVIGATION HANDLING ---\n    let lastUrl = location.href;\n    new MutationObserver(() => {\n        const url = location.href;\n        if (url !== lastUrl) {\n            lastUrl = url;\n            applyYouTubeEnhancements();\n        }\n    }).observe(document, { subtree: true, childList: true });\n\n\n    // --- STYLES ---\n    const styles = `\n        /* --- Top Bar Auto-Hide & Content Slide --- */\n        .video-page-active #masthead-container {\n            position: fixed;\n            z-index: 1001;\n            width: 100%;\n            transform: translateY(-100%);\n            transition: transform 0.3s ease-in-out;\n            box-shadow: 0 2px 10px rgba(0,0,0,0.2);\n        }\n\n        .video-page-active.show-masthead #masthead-container {\n            transform: translateY(0);\n        }\n\n        .video-page-active ytd-page-manager {\n            margin-top: 0 !important;\n            transition: margin-top 0.3s ease-in-out !important;\n        }\n\n        .video-page-active.show-masthead ytd-page-manager {\n            margin-top: 56px !important; /* Standard height of YouTube's top bar */\n        }\n\n        /* --- Full-Width Video Info Section --- */\n        .video-page-active #primary.ytd-watch-flexy,\n        .video-page-active #primary-inner.ytd-watch-flexy,\n        .video-page-active #columns.ytd-watch-flexy {\n            width: 100% !important;\n            max-width: none !important;\n        }\n\n        .video-page-active #secondary.ytd-watch-flexy {\n            display: none !important;\n        }\n\n        /* --- Declutter Action Bar (Updated & More Stable Selectors) --- */\n        /* The buttons like/dislike, share, download, etc., are all contained within\n           an element with the ID 'actions-inner'. By hiding this single container,\n           we remove all of them in one go. */\n        .video-page-active #actions-inner {\n            display: none !important;\n        }\n        /* The three-dot menu is typically a sibling to '#actions-inner',\n           so it remains unaffected by the rule above, giving us the desired clean look. */\n    `;\n\n    const styleSheet = document.createElement(\"style\");\n    styleSheet.innerText = styles;\n    document.head.appendChild(styleSheet);\n\n\n    // --- EVENT LISTENERS ---\n    document.addEventListener('mousemove', (event) => {\n        if (!document.body.classList.contains('video-page-active')) {\n            return;\n        }\n        if (event.clientY < TOP_BAR_TRIGGER_HEIGHT) {\n            document.body.classList.add('show-masthead');\n        } else {\n            document.body.classList.remove('show-masthead');\n        }\n    });\n\n    // Initial run on page load\n    applyYouTubeEnhancements();\n\n})();\n",
+    "customtheme": false,
+    "darktheme": true,
+    "date": 1754560960610,
+    "defaultvolume": false,
+    "disableautoplay": true,
+    "executescript": true,
+    "expanddescription": false,
+    "filter": "none",
+    "griditemsperrow": {
+      "channel": {
+        "shorts": {
+          "apply": false,
+          "count": 5
+        },
+        "videos": {
+          "apply": false,
+          "count": 4
+        }
+      },
+      "posts": {
+        "apply": false,
+        "count": 4
+      },
+      "shorts": {
+        "apply": false,
+        "count": 8
+      },
+      "videos": {
+        "apply": false,
+        "count": 4
+      }
+    },
+    "hidecardsendscreens": true,
+    "hidechat": true,
+    "hidecomments": true,
+    "hiderelated": true,
+    "hideshorts": true,
+    "ignoreplaylists": true,
+    "ignorepopupplayer": true,
+    "localecode": "en_US",
+    "localedir": "ltr",
+    "miniplayer": true,
+    "miniplayerposition": "bottom-right",
+    "miniplayersize": "640x360",
+    "newestcomments": true,
+    "overridespeeds": true,
+    "pauseforegroundtab": false,
+    "pausevideos": true,
+    "popuplayersize": "640x360",
+    "previousversion": "0.0.0",
+    "qualityembeds": "medium",
+    "qualityembedsfullscreen": "hd1080",
+    "qualityplaylists": "hd720",
+    "qualityplaylistsfullscreen": "hd1080",
+    "qualityvideos": "hd720",
+    "qualityvideosfullscreen": "hd1080",
+    "reload": false,
+    "reversemousewheeldirection": false,
+    "selectquality": false,
+    "selectqualityfullscreenoff": false,
+    "selectqualityfullscreenon": false,
+    "speed": 1,
+    "speedvariation": 0.02,
+    "stopvideos": false,
+    "theatermode": true,
+    "theme": "default-dark",
+    "themevariant": "dark-red.css",
+    "update": 1754560960610,
+    "vendorthemevariant": "youtube-deep-dark.css",
+    "videofilters": {
+      "blur": 0,
+      "brightness": 100,
+      "contrast": 100,
+      "grayscale": 0,
+      "rotation": 0,
+      "inversion": 0,
+      "saturation": 100,
+      "sepia": 0
+    },
+    "volume": 50,
+    "volumemultiplier": 2,
+    "volumevariation": 5,
+    "whatsnew": false,
+    "wideplayer": false,
+    "wideplayerviewport": false
+  }
+}
