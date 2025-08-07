@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         YouTube UI Enhancer
 // @namespace    http://tampermonkey.net/
-// @version      1.5
-// @description  Hides top bar (content slides up), makes video info full-width, and hides action buttons (like, share, etc.) for a cleaner UI.
+// @version      2.3
+// @description  Adds video page enhancements (full-width info, decluttered actions) and a minimalist, search-focused homepage.
 // @author       ayushh
 // @match        https://www.youtube.com/*
 // @grant        GM_addStyle
@@ -13,8 +13,7 @@
     'use strict';
 
     // --- CONFIGURATION ---
-    const TOP_BAR_TRIGGER_HEIGHT = 50; // The height (in pixels) of the trigger area at the top.
-    const ELEMENT_WAIT_TIMEOUT = 10000; // Max time (in ms) to wait for elements to appear.
+    const ELEMENT_WAIT_TIMEOUT = 15000; // Max time (in ms) to wait for elements to appear.
 
     // --- UTILITY FUNCTION ---
     /**
@@ -44,58 +43,92 @@
 
     // --- CORE LOGIC ---
     /**
-     * Applies all the visual enhancements to the page.
+     * This function acts as a router. It checks the current page URL
+     * and applies the correct set of enhancements.
      */
-    async function applyYouTubeEnhancements() {
-        if (window.location.pathname !== '/watch') {
-            document.body.classList.remove('video-page-active', 'show-masthead');
-            return;
-        }
+    async function handlePageChange() {
+        // Reset all custom classes to ensure a clean slate on page navigation.
+        document.body.classList.remove('video-page-active', 'homepage-active');
 
-        try {
-            await waitForElement('ytd-page-manager');
-            document.body.classList.add('video-page-active');
-            console.log("YouTube UI Enhancer: Video page detected. Applying enhancements.");
-        } catch (error) {
-            console.error("YouTube UI Enhancer: Could not apply enhancements.", error);
+        const pathname = window.location.pathname;
+
+        if (pathname === '/watch') {
+            // --- VIDEO PAGE LOGIC ---
+            try {
+                await waitForElement('ytd-page-manager');
+                document.body.classList.add('video-page-active');
+                console.log("YouTube UI Enhancer: Video page detected.");
+            } catch (error) {
+                console.error("YouTube UI Enhancer: Could not apply video page enhancements.", error);
+            }
+        } else if (pathname === '/' || pathname.startsWith('/feed/')) {
+            // --- HOMEPAGE LOGIC ---
+            try {
+                await waitForElement('ytd-searchbox');
+                document.body.classList.add('homepage-active');
+                console.log("YouTube UI Enhancer: Homepage detected.");
+            } catch (error) {
+                console.error("YouTube UI Enhancer: Could not apply homepage enhancements.", error);
+            }
         }
     }
 
     // --- INITIALIZATION AND NAVIGATION HANDLING ---
+    // A MutationObserver detects page changes within YouTube (e.g., clicking a new video or the logo).
     let lastUrl = location.href;
     new MutationObserver(() => {
         const url = location.href;
         if (url !== lastUrl) {
             lastUrl = url;
-            applyYouTubeEnhancements();
+            handlePageChange();
         }
     }).observe(document, { subtree: true, childList: true });
 
 
     // --- STYLES ---
     const styles = `
-        /* --- Top Bar Auto-Hide & Content Slide --- */
-        .video-page-active #masthead-container {
-            position: fixed;
-            z-index: 1001;
-            width: 100%;
-            transform: translateY(-100%);
-            transition: transform 0.3s ease-in-out;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        /* --- Minimalist Homepage --- */
+
+        /* Apply these styles only when the 'homepage-active' class is on the body */
+        .homepage-active #guide, /* Hides the left sidebar */
+        .homepage-active #chips-wrapper, /* Hides the topic filter chips */
+        .homepage-active #contents, /* Hides the main video grid */
+        .homepage-active ytd-message-renderer, /* Hides notices like 'Watch history is paused' */
+        .homepage-active #masthead-container #start, /* Hides the logo and guide button */
+        .homepage-active #masthead-container #end { /* Hides the account buttons */
+            display: none !important;
         }
 
-        .video-page-active.show-masthead #masthead-container {
-            transform: translateY(0);
+        /* Force the main content area to take up the full viewport height and center its contents */
+        .homepage-active #content.ytd-app {
+            display: flex;
+            flex-direction: column;
+            justify-content: center; /* Vertically center */
+            align-items: center; /* Horizontally center */
+            height: 80vh; /* Use viewport height for centering */
         }
 
-        .video-page-active ytd-page-manager {
-            margin-top: 0 !important;
-            transition: margin-top 0.3s ease-in-out !important;
+        /* Add the 'YouTube' title above the search bar using a pseudo-element */
+        .homepage-active #content.ytd-app::before {
+            content: 'YouTube';
+            font-family: "YouTube Sans","Roboto",sans-serif;
+            font-size: 5rem;
+            font-weight: 600;
+            /* Use YouTube's primary text color variable for theme (light/dark) compatibility */
+            color: var(--yt-spec-text-primary);
+            margin-bottom: 24px;
+            letter-spacing: -0.05em;
         }
 
-        .video-page-active.show-masthead ytd-page-manager {
-            margin-top: 56px !important; /* Standard height of YouTube's top bar */
+        /* Make the search bar container larger and more prominent */
+        .homepage-active ytd-searchbox {
+            width: 60vw !important;
+            max-width: 700px !important;
+            min-width: 300px !important;
         }
+
+
+        /* --- Video Page Enhancements --- */
 
         /* --- Full-Width Video Info Section --- */
         .video-page-active #primary.ytd-watch-flexy,
@@ -109,35 +142,23 @@
             display: none !important;
         }
 
-        /* --- Declutter Action Bar (Updated & More Stable Selectors) --- */
-        /* The buttons like/dislike, share, download, etc., are all contained within
-           an element with the ID 'actions-inner'. By hiding this single container,
-           we remove all of them in one go. */
-        .video-page-active #actions-inner {
+        /* --- Declutter Action Bar (More Robust Selector) --- */
+        /* Hides the container with the like/dislike, share, download, etc. buttons */
+        .video-page-active #actions.ytd-watch-metadata .ytd-menu-renderer {
             display: none !important;
         }
-        /* The three-dot menu is typically a sibling to '#actions-inner',
-           so it remains unaffected by the rule above, giving us the desired clean look. */
+        /* We must then re-show the three-dot menu, which is also a ytd-menu-renderer,
+           but has a different parent structure we can use to identify it. */
+        .video-page-active #actions.ytd-watch-metadata > ytd-menu-renderer {
+            display: flex !important;
+        }
     `;
 
     const styleSheet = document.createElement("style");
     styleSheet.innerText = styles;
     document.head.appendChild(styleSheet);
 
-
-    // --- EVENT LISTENERS ---
-    document.addEventListener('mousemove', (event) => {
-        if (!document.body.classList.contains('video-page-active')) {
-            return;
-        }
-        if (event.clientY < TOP_BAR_TRIGGER_HEIGHT) {
-            document.body.classList.add('show-masthead');
-        } else {
-            document.body.classList.remove('show-masthead');
-        }
-    });
-
     // Initial run on page load
-    applyYouTubeEnhancements();
+    handlePageChange();
 
 })();
